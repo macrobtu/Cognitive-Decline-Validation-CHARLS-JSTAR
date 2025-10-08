@@ -8,7 +8,7 @@ This study develops a cognitive decline risk prediction model using the China He
 
 ## Repository Structure
 
-- `/data`: Contains the three final, anonymized and processed datasets used for the analysis.
+- `/data`: Contains the sample data for the analysis. Full dataset can be found online:https://g2aging.org/ 
 - `/scripts`: Contains the Python scripts to reproduce the analysis.
 
 ## How to Run
