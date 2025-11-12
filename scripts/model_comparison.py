@@ -79,9 +79,9 @@ print("✅ All libraries imported successfully.")
 # ==================================
 print("\n--- Step 1: Configuring paths and variables ---")
 
-# --- Define Project Structure ---
-# Assumes this script is in the root folder: C:\Users\tolph\Desktop\Cognitive-Decline-Validation-CHARLS-JSTAR
-BASE_DIR = Path(r"C:\Users\tolph\Desktop\Cognitive-Decline-Validation-CHARLS-JSTAR")
+# --- Define Project Structure (relative & portable) ---
+# Automatically locate the project root based on the current script location
+BASE_DIR = Path(__file__).resolve().parent.parent  # assumes this file is inside "scripts/" folder
 DATA_DIR = BASE_DIR / "data"
 OUTPUT_DIR = BASE_DIR / "output"
 
