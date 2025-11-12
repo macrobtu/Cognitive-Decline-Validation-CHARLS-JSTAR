@@ -1,0 +1,35 @@
+# Core data and numerical processing
+pandas>=2.0
+numpy>=1.25
+
+# Machine learning and imputation
+scikit-learn>=1.3
+
+# Survival analysis models (GBSA, RSF)
+scikit-survival>=0.22
+
+# Plotting
+matplotlib>=3.8
+seaborn>=0.13
+
+# File system utilities (Pathlib is built-in, no need to install)
+
+# Core data handling
+pandas>=2.0
+numpy>=1.25
+
+# Machine learning / preprocessing
+scikit-learn>=1.3
+scikit-survival>=0.22
+
+# Modeling and visualization
+xgboost>=2.0
+lightgbm>=4.1
+matplotlib>=3.8
+seaborn>=0.13
+scipy>=1.11
+lifelines>=0.28
+tqdm>=4.66
+dcurves
+statsmodels
+openpyxl
