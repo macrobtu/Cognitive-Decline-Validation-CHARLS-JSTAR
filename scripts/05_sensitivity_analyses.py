@@ -181,8 +181,7 @@ for spine in ax.spines.values():
     spine.set_linewidth(1)
 
 # Save Results
-out_path = OUTPUT_DIR / ""
-"FigS4A_CHARLS_Robust_Sensitivity_Analysis.png"
+out_path = OUTPUT_DIR / "FigS4A_CHARLS_Robust_Sensitivity_Analysis.png"
 plt.savefig(out_path, dpi=300, bbox_inches='tight')
 plt.show()
 
