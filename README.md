@@ -1,6 +1,24 @@
 # Cognitive Decline Validation (CHARLS–JSTAR)
-This repository contains the Python scripts and processed data used for validating machine learning models predicting cognitive decline, based on the CHARLS and JSTAR cohorts.
-The aim is to build and validate risk prediction models for cognitive decline using multi-year longitudinal datasets, combining traditional survival models and ensemble machine learning methods.
+
+This repository contains the validation pipeline for predicting cognitive decline across different aging cohorts.
+
+## 📂 Research Scripts
+The analysis follows a sequential workflow:
+* **01_model_comparison.py**: Compares different machine learning models (GMM, K-Means).
+* **02_CoxPH_model_performance.py**: Evaluates core model metrics on the development set.
+* **03_charls_validation.py**: Temporal validation using the **CHARLS** dataset (2015–2018).
+* **04_jstar_validation.py**: External validation using the **JSTAR** dataset.
+* **05_sensitivity_analyses.py**: Robustness checks for 2-year vs. 4-year horizons.
+
+---
+
+## ⚠️ Data Disclaimer
+
+### JSTAR Data (Privacy & Compliance)
+Due to the strict privacy policies of the **Japan Study on Aging and Retirement (JSTAR)**, raw data cannot be publicly shared. 
+* **Synthetic Sample**: The `jstar` CSV files provided in the `data/` folder are **randomized sample files** for code demonstration only.
+* **Result Note**: Running script `04` with this sample data **will not produce valid results or the figures** shown in the publication due to intentional data randomization. 
+* **Official Access**: To obtain the original data, please apply through the [JSTAR official portal](https://www.rieti.go.jp/en/projects/jstar/).
 
 ---
 ## 📂 Project Structure
