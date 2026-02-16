@@ -2,16 +2,8 @@
 # coding: utf-8
 
 # ==================================
-# ✅ Master Analysis Script: Model Comparison and Final Model Training (CHARLS)
+# Model Comparison and Final Model Training (CHARLS).
 # This script performs the full analysis workflow on the CHARLS dataset.
-# It is divided into sequential blocks.
-#
-# This script corresponds to the combination of multiple notebook cells
-# (In[12], In[13], In[14], In[18], In[20]) from the original file.
-#
-# ❗️ WARNING: Step 7 (Cross-Validation) is computationally intensive
-# and may take several hours to run due to the use of IterativeImputer
-# within each fold for multiple models.
 # ==================================
 
 print("--- Initializing script and importing all necessary libraries... ---")
@@ -35,7 +27,7 @@ from sklearn.base import clone, BaseEstimator
 from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
-from sklearn.experimental import enable_iterative_imputer # Enable experimental
+from sklearn.experimental import enable_iterative_imputer 
 from sklearn.impute import SimpleImputer, IterativeImputer
 from sklearn.linear_model import BayesianRidge, LinearRegression
 from sklearn.ensemble import ExtraTreesRegressor
@@ -81,7 +73,7 @@ print("\n--- Step 1: Configuring paths and variables ---")
 
 # --- Define Project Structure (relative & portable) ---
 # Automatically locate the project root based on the current script location
-BASE_DIR = Path(__file__).resolve().parent.parent  # assumes this file is inside "scripts/" folder
+BASE_DIR = Path(__file__).resolve().parent.parent  
 DATA_DIR = BASE_DIR / "data"
 OUTPUT_DIR = BASE_DIR / "output"
 
@@ -376,7 +368,7 @@ class LightGBMRegressionWrapper(BaseSurvivalWrapper):
                                       num_leaves=self.num_leaves,
                                       random_state=self.random_state,
                                       n_jobs=self.n_jobs,
-                                      verbose=-1, # Suppress LightGBM verbosity
+                                      verbose=-1, 
                                       **self.kwargs)
         try:
             self.model_.fit(X, y["time"])
@@ -392,15 +384,10 @@ print("✅ Model wrappers defined.")
 # ==================================
 # 7. Model Comparison: Cross-Validation
 # ==================================
-print("\n--- Step 7: Starting 8-model comparison (Cross-Validation)... ---")
-# Using the (faster) SimpleImputer pipeline for this comparison
-# If you want the more complex one, change 'preprocess' here.
-# We will use the SIMPLE (median/mode) imputer for model comparison,
-# as IterativeImputer is too slow for 10-fold CV * 8 models.
+print("\n--- Step 7: Starting model comparison (Cross-Validation)... ---")
 print("NOTE: Using SimpleImputer (median/mode) for this comparison for speed.")
 print("The 'IterativeImputer' pipeline will be used for the final model.")
 
-# --- Define SIMPLE Preprocessing Pipeline (for CV) ---
 num_pipeline_simple = Pipeline([
     ("imputer", SimpleImputer(strategy='median')),
     ("scaler", StandardScaler())
@@ -411,7 +398,7 @@ cat_pipeline_simple = Pipeline([
 ])
 preprocess_simple = ColumnTransformer(
     transformers=[
-        ("num", num_pipeline_simple, num_features), # Apply to all num_features
+        ("num", num_pipeline_simple, num_features), 
         ("cat", cat_pipeline_simple, cat_features)
     ],
     remainder='drop'
@@ -421,17 +408,17 @@ print("✅ SIMPLE preprocessing pipeline (for CV) defined.")
 # --- Define Model Dictionary ---
 models = {
     "CoxPH": CoxPHWrapper(),
-   # "ElasticNet-CoxPH": CoxnetWrapper(l1_ratio=0.9),
+    "ElasticNet-CoxPH": CoxnetWrapper(l1_ratio=0.9),
     "GBSA": GBSAWrapper(n_estimators=50, random_state=42),
-   # "RSF": RSFWrapper(n_estimators=100, random_state=42),
+    "RSF": RSFWrapper(n_estimators=100, random_state=42),
     "EST": ESTWrapper(n_estimators=50, random_state=42, n_jobs=-1),
-   # "XGBoost-Cox": XGBoostCoxWrapper(n_estimators=100, random_state=42, n_jobs=-1),
+    "XGBoost-Cox": XGBoostCoxWrapper(n_estimators=100, random_state=42, n_jobs=-1),
     "LightGBM-Reg": LightGBMRegressionWrapper(n_estimators=50, random_state=42, n_jobs=-1, verbosity=-1),
 }
 print(f"✅ Defined {len(models)} models for comparison.")
 
 results = {name: {"c_index": [], "cd_auc": [], "ibs": [], "rmse": []} for name in models}
-N_SPLITS = 5
+N_SPLITS = 10
 kf = StratifiedKFold(n_splits=N_SPLITS, shuffle=True, random_state=42)
 successful_folds = {name: 0 for name in models}
 
@@ -444,9 +431,8 @@ for model_name, base_model in models.items():
         X_train, X_test = X_train_full.iloc[train_idx_inner], X_train_full.iloc[test_idx_inner]
         y_train, y_test = y_train_full[train_idx_inner], y_train_full[test_idx_inner]
 
-        # --- Build Pipeline with SIMPLE preprocess ---
         pipeline = Pipeline([
-            ('preprocess', clone(preprocess_simple)), # Use the SIMPLE preprocessor
+            ('preprocess', clone(preprocess_simple)), 
             ('model', clone(base_model))
         ])
 
@@ -636,7 +622,7 @@ else:
     print(display_df[cols_to_display])
 
     # Save summary table
-    summary_path = OUTPUT_DIR / "model_comparison_summary.xlsx"
+    summary_path = OUTPUT_DIR / "table2_model_comparison_summary.xlsx"
     display_df.to_excel(summary_path)
     print(f"\n📂 Summary table saved to: {summary_path}")
 
@@ -674,8 +660,6 @@ print("="*60)
 
 # --- 9.1 Define Final Model and Preprocessing (using COMPLEX IterativeImputer) ---
 print("\n--- 9.1: Defining FINAL pipeline with IterativeImputer ---")
-# This uses the 'preprocess' object defined at the top (lines 90-101)
-# which contains IterativeImputer.
 final_cox_model_wrapper = CoxPHWrapper()
 final_pipeline = Pipeline([
     ('preprocess', clone(preprocess)), # Use the COMPLEX preprocessor
@@ -904,7 +888,6 @@ print("\n--- 9.5: Extracting detailed stats with lifelines (from 80% train set).
 if final_model_fitted:
     try:
         preprocess_step = final_pipeline.named_steps['preprocess']
-        # We need to use the .transform from the *fitted* pipeline
         X_train_full_processed = preprocess_step.transform(X_train_full)
         feature_names_processed = preprocess_step.get_feature_names_out()
         X_processed_df = pd.DataFrame(X_train_full_processed, columns=feature_names_processed, index=X_train_full.index)
@@ -915,7 +898,7 @@ if final_model_fitted:
 
         print("Fitting equivalent model in lifelines (penalizer=0)...")
         from lifelines import CoxPHFitter
-        cph_lifelines = CoxPHFitter(penalizer=0) # Match alpha=0
+        cph_lifelines = CoxPHFitter(penalizer=0) 
         try:
             cph_lifelines.fit(df_lifelines, duration_col='time', event_col='event')
             print("✅ lifelines model fitted successfully.")
@@ -929,7 +912,7 @@ if final_model_fitted:
             final_summary_display = final_summary[cols_to_show].sort_values(by='p')
             print(final_summary_display.round(4))
             
-            excel_path_lifelines = OUTPUT_DIR / "Final_CoxPH_Model_Detailed_Summary_lifelines_80Train_IterImp.xlsx"
+            excel_path_lifelines = OUTPUT_DIR / "table3_Final_CoxPH_Model_Detailed_Summary_lifelines_80Train_IterImp.xlsx"
             final_summary_display.to_excel(excel_path_lifelines, index=True) 
             print(f"\n📂 Detailed stats table saved to: {excel_path_lifelines}")
         except Exception as e_ll: 
@@ -938,497 +921,3 @@ if final_model_fitted:
         print(f"❌ Error preparing data for lifelines: {e_prep}"); traceback.print_exc()
 else:
      print("\n⚠️ Skipping lifelines analysis (final model did not fit).")
-
-
-# %%
-# ==================================
-# 10. Training Set KM Curve
-# ==================================
-print("\n" + "="*60)
-print("--- Step 10: Generating Training Set KM Curve ---")
-print("="*60)
-
-if final_model_fitted:
-    try:
-        print("Loading lifelines summary to build scorecard...")
-        # Note: This assumes the lifelines summary file from Step 9.5 was successfully created.
-        # A more robust way would be to pass 'final_summary_display' directly.
-        # For simplicity, we re-load the file.
-        lifelines_summary_path = OUTPUT_DIR / "Final_CoxPH_Model_Detailed_Summary_lifelines_80Train_IterImp.xlsx"
-        lifelines_summary = pd.read_excel(lifelines_summary_path, index_col=0)
-        
-        print("Calculating scores and thresholds on 80% training data...")
-        significant_vars_summary = lifelines_summary[lifelines_summary['p'] < 0.05].copy()
-        if significant_vars_summary.empty: 
-            print("❌ No significant variables (p < 0.05) found. Cannot create scorecard for KM plot.")
-        else:
-            MAX_POINTS = 100
-            max_abs_coef = significant_vars_summary['coef'].abs().max()
-            if max_abs_coef == 0: raise ValueError("Max coefficient is zero.")
-            
-            significant_vars_summary['Points'] = (significant_vars_summary['coef'] / max_abs_coef * MAX_POINTS).round().astype(int)
-            risk_scorecard_points = significant_vars_summary[['Points']]
-            scorecard_lifelines_names = risk_scorecard_points.index.tolist()
-            
-            # --- We need the processed training data (X_train_full_processed) and original df_train_source ---
-            # Let's re-create df_train_source (since it was redefined in a previous cell)
-            df_train_source_km = df.iloc[train_idx].copy() # Get the 80% data again
-            df_train_source_km['time'] = df_train_source_km[TIME_COL]
-            df_train_source_km['event'] = df_train_source_km[EVENT_COL].astype(bool)
-
-            # We already have X_train_full_processed (as X_processed_df) and actual_feature_names from Step 9.5
-            # Let's ensure we use the correct processed data and feature names
-            X_train_processed_df = df_lifelines.drop(columns=['time', 'event'])
-            actual_feature_names = X_train_processed_df.columns.tolist()
-
-            # --- Create Name Mapping ---
-            print("Creating feature name mapping...")
-            actual_feature_names_mapping = {}
-            missing_in_actual = []
-            for ll_name in scorecard_lifelines_names:
-                if ll_name in actual_feature_names:
-                    actual_feature_names_mapping[ll_name] = ll_name
-                else:
-                    base_name_ll = ll_name.split('__')[-1]
-                    matched_actual_name = [actual for actual in actual_feature_names if actual.endswith(base_name_ll)]
-                    if len(matched_actual_name) == 1:
-                        actual_feature_names_mapping[ll_name] = matched_actual_name[0]
-                    else:
-                         missing_in_actual.append(ll_name)
-            if missing_in_actual:
-                 raise ValueError(f"Scorecard mapping failed: {missing_in_actual}")
-            else:
-                 print("✅ Feature name mapping successful.")
-
-            # --- Calculate Scores & Thresholds ---
-            score_features_actual = [actual_feature_names_mapping[ll_name] for ll_name in scorecard_lifelines_names]
-            X_train_significant = X_train_processed_df[score_features_actual]
-            points_vector = risk_scorecard_points.loc[scorecard_lifelines_names, 'Points'].values
-            train_total_risk_scores = X_train_significant.dot(points_vector) 
-            
-            df_train_source_km['Total_Risk_Score'] = train_total_risk_scores
-            
-            q1, q2 = train_total_risk_scores.quantile([0.33, 0.66]).tolist()
-            print(f"✅ Risk thresholds (q1, q2) calculated: {q1:.2f}, {q2:.2f}")
-
-            def assign_risk_group(score, q1_thresh, q2_thresh):
-                if pd.isna(score): return 'Unknown'
-                if score <= q1_thresh: return 'Low Risk'
-                elif score <= q2_thresh: return 'Medium Risk'
-                else: return 'High Risk'
-            df_train_source_km['Risk_Group'] = df_train_source_km['Total_Risk_Score'].apply(lambda x: assign_risk_group(x, q1, q2))
-            print("✅ Risk groups assigned to training data.")
-            print(df_train_source_km['Risk_Group'].value_counts())
-
-            # --- Plot KM Curve ---
-            print("\nPlotting Training Set KM Curve...")
-            T_train_km = df_train_source_km['time']
-            E_train_km = df_train_source_km['event']
-            groups_train_km = df_train_source_km['Risk_Group']
-            valid_groups_train = groups_train_km.unique()
-            
-            if len(valid_groups_train) < 2:
-                print("❌ Not enough risk groups to plot KM curve.")
-            else:
-                kmf_dict = {} 
-                color_map = {"Low Risk": "green", "Medium Risk": "orange", "High Risk": "red"}
-                risk_group_order = ['Low Risk', 'Medium Risk', 'High Risk'] 
-                
-                for group_name in risk_group_order:
-                    if group_name in valid_groups_train:
-                        mask = (groups_train_km == group_name)
-                        if mask.sum() > 0:
-                            kmf = KaplanMeierFitter()
-                            kmf.fit(T_train_km[mask], event_observed=E_train_km[mask], label=f"{group_name} (n={mask.sum()})")
-                            kmf_dict[group_name] = kmf
-                
-                plt.figure(figsize=(8, 10))
-                ax = plt.subplot(111)
-                
-                if 'Low Risk' in kmf_dict: kmf_dict['Low Risk'].plot(ax=ax, ci_show=True, color=color_map["Low Risk"])
-                if 'Medium Risk' in kmf_dict: kmf_dict['Medium Risk'].plot(ax=ax, ci_show=True, color=color_map["Medium Risk"])
-                if 'High Risk' in kmf_dict: kmf_dict['High Risk'].plot(ax=ax, ci_show=True, color=color_map["High Risk"])
-                
-                groups_to_test = [g for g in risk_group_order if g in kmf_dict]
-                p_value_logrank = np.nan
-                if len(groups_to_test) >= 2:
-                     try:
-                         df_for_test = df_train_source_km[df_train_source_km['Risk_Group'].isin(groups_to_test)]
-                         logrank_result = multivariate_logrank_test(df_for_test['time'], df_for_test['Risk_Group'], df_for_test['event'])
-                         p_value_logrank = logrank_result.p_value
-                         print(f"\n✅ Log-rank test p-value: {p_value_logrank:.4f}")
-                     except Exception as e_lr:
-                          print(f"⚠️ Log-rank test failed: {e_lr}"); traceback.print_exc()
-                
-                plt.title("Kaplan-Meier Curves by Predicted Risk Groups (80% Training Set)", fontsize=14)
-                plt.xlabel("Follow-up Time (Years)", fontsize=12)
-                plt.ylabel("Estimated Survival Probability", fontsize=12)
-                plt.grid(True, linestyle='--', alpha=0.6)
-                plt.legend(title="Risk Group", loc="lower left", fontsize=10)
-                plt.xlim(0, 4.5); plt.xticks(ticks=[0, 2, 4])
-                plt.ylim(0.2, 1.05); plt.yticks(ticks=[0.2, 0.4, 0.6, 0.8, 1.0])
-                
-                if not pd.isna(p_value_logrank):
-                    p_text = f"Log-rank test, p < 0.001" if p_value_logrank < 0.001 else f"Log-rank test, p = {p_value_logrank:.3f}"
-                    plt.text(0.95, 0.25, p_text, ha='right', va='bottom', transform=ax.transAxes, fontsize=10)
-                
-                try:
-                    kmfs_for_table = [kmf_dict.get(group) for group in risk_group_order if group in kmf_dict]
-                    if len(kmfs_for_table) >= 2:
-                        add_at_risk_counts(*kmfs_for_table, ax=ax, fontsize=10)
-                except Exception as e_at:
-                    print(f"⚠️ Error adding at-risk counts: {e_at}")
-                
-                plt.tight_layout(pad=1.5, rect=[0, 0.15, 1, 0.95]) 
-                km_output_path = OUTPUT_DIR / "CHARLS_TrainingSet_KM_Curve.png"
-                plt.savefig(km_output_path, dpi=300)
-                plt.show()
-                print(f"✅ Training Set KM curve saved to: {km_output_path}")
-
-    except Exception as e:
-        print(f"❌ Error generating Training Set KM curve: {e}"); traceback.print_exc()
-else:
-     print("\n⚠️ Skipping Training Set KM Curve (final model did not fit).")
-
-
-# %%
-# ==================================
-# 11. Training Set DCA
-# ==================================
-print("\n" + "="*60)
-print("--- Step 11: Generating Training Set DCA ---")
-print("="*60)
-
-if final_model_fitted:
-    try:
-        print("Calculating risk scores for DCA...")
-        TIME_HORIZON_DCA = 4.0  # Use 4-year for CHARLS
-
-        # Use the full 80% training features (X_train_full) so lengths/index align with df_train_source_km
-        if hasattr(final_pipeline, 'predict_survival_function'):
-            surv_funcs_dca = final_pipeline.predict_survival_function(X_train_full)
-            survival_probs_dca = np.array([fn(TIME_HORIZON_DCA) for fn in surv_funcs_dca])
-            risk_probs_dca = 1 - survival_probs_dca
-
-            # Align by index to avoid length mismatch
-            risk_series = pd.Series(risk_probs_dca, index=X_train_full.index)
-
-            # If df_train_source_km was created from the same train_idx, reindex will align correctly
-            df_train_source_km['model_risk_dca'] = risk_series.reindex(df_train_source_km.index)
-
-            # Warn if any values are missing after alignment
-            if df_train_source_km['model_risk_dca'].isna().any():
-                print("⚠️ Some model_risk_dca values are missing after alignment. Check train indices and X_train_full.")
-        else:
-            # Fallback: try pipeline.predict (risk score) and scale to probability-like score if needed
-            print("⚠️ final_pipeline has no predict_survival_function, falling back to risk-score based DCA.")
-            risk_scores = final_pipeline.predict(X_train_full)
-            # convert risk score to pseudo-probability by min-max (only for plotting/DCA; document this)
-            ps = (risk_scores - np.nanmin(risk_scores)) / (np.nanmax(risk_scores) - np.nanmin(risk_scores) + 1e-12)
-            df_train_source_km['model_risk_dca'] = pd.Series(ps, index=X_train_full.index).reindex(df_train_source_km.index)
-
-        print("Running dcurves...")
-        dca_results = dca(
-            data=df_train_source_km[['outcome_dca', 'model_risk_dca']],
-            outcome='outcome_dca',
-            modelnames=['model_risk_dca'],
-            thresholds=np.arange(0.01, 0.61, 0.01)
-        )
-        
-        print("Plotting DCA...")
-        df_m = dca_results[dca_results['model'] == 'model_risk_dca']
-        df_all = dca_results[dca_results['model'] == 'all']
-        df_none = dca_results[dca_results['model'] == 'none']
-        pt = df_m['threshold'].values
-        nb_m = df_m['net_benefit'].values
-        nb_all = df_all['net_benefit'].values
-        nb_none = df_none['net_benefit'].values
-        
-        nb_m_s = lowess(nb_m, pt, frac=0.25, it=0)[:,1] # Smoothed
-        
-        plt.figure(figsize=(7,6))
-        plt.plot(pt, nb_m_s, lw=2.5, color='#0072B2', label='CoxPH Model (Training)')
-        plt.plot(pt, nb_all, lw=2, color='#E69F00', label='Treat All')
-        plt.axhline(0, color='gray', lw=1.3, ls='--', label='Treat None')
-        
-        plt.title(f'Decision Curve Analysis (80% Training Set, {TIME_HORIZON_DCA}-Year)', fontsize=14)
-        plt.xlabel('Threshold Probability', fontsize=12); plt.ylabel('Net Benefit', fontsize=12)
-        plt.xlim(0.0, 0.60); plt.ylim(-0.1, 0.20)
-        plt.xticks(ticks=np.arange(0.0, 0.61, 0.1)); plt.yticks(ticks=np.arange(-0.1, 0.21, 0.1))
-        plt.grid(True, ls='--', alpha=0.5); plt.legend(loc='upper right', fontsize=11, frameon=False)
-        
-        prev = df_train_source_km['outcome_dca'].mean()
-        if prev > 0 and prev < plt.xlim()[1]:
-            plt.axvline(prev, ls=':', lw=1.5, color='gray')
-            plt.text(prev, plt.ylim()[0] + 0.005, f'Prevalence ≈ {prev:.3f}\n(Treat-all NB=0)', ha='left', va='bottom', fontsize=9)
-            print(f"ℹ️ Training set {TIME_HORIZON_DCA}-year prevalence: {prev:.4f}")
-        
-        # Calculate and plot Zero-NB and Highlight
-        pt_start, pt_end = np.nan, np.nan
-        diff_model_vs_all = nb_m_s - nb_all
-        sign_change_all = np.where(np.sign(diff_model_vs_all[:-1]) != np.sign(diff_model_vs_all[1:]))[0]
-        start_idx_list = [i for i in sign_change_all if diff_model_vs_all[i] < 0 and diff_model_vs_all[i+1] > 0]
-        if len(start_idx_list) > 0:
-            i = start_idx_list[0]; x0, x1 = pt[i], pt[i+1]; y0, y1 = diff_model_vs_all[i], diff_model_vs_all[i+1]
-            pt_start = x0 - y0 * (x1 - x0) / (y1 - y0)
-        elif diff_model_vs_all[0] > 0:
-            pt_start = pt[0]
-            
-        diff_model_vs_none = nb_m_s
-        sign_change_none = np.where(np.sign(diff_model_vs_none[:-1]) != np.sign(diff_model_vs_none[1:]))[0]
-        end_idx_list = [i for i in sign_change_none if diff_model_vs_none[i] > 0 and diff_model_vs_none[i+1] < 0]
-        if len(end_idx_list) > 0:
-            i = end_idx_list[0]; x0, x1 = pt[i], pt[i+1]; y0, y1 = diff_model_vs_none[i], diff_model_vs_none[i+1]
-            pt_end = x0 - y0 * (x1 - x0) / (y1 - y0)
-            if pt_end < plt.xlim()[1]:
-                plt.scatter([pt_end],[0], s=50, color='#0072B2')
-                plt.text(pt_end + 0.002, 0.001, f'Zero-NB ≈ {pt_end:.2f}', ha='left', va='bottom', fontsize=9, color='#0072B2')
-        elif (nb_m_s > 0).all():
-            pt_end = pt[-1]
-            
-        if not np.isnan(pt_start) and not np.isnan(pt_end) and pt_start < pt_end:
-            plt.axvspan(pt_start, pt_end, color='#0072B214', label='Model Provides Benefit')
-            plt.legend(loc='upper right', fontsize=11, frameon=False)
-            print(f"ℹ️ Model benefit range (Training): {pt_start:.3f} - {pt_end:.3f}")
-        else:
-            print("⚠️ No clear benefit range found for the model on the training set.")
-            
-        out_path = OUTPUT_DIR / "CHARLS_DCA_TrainingSet.png"
-        plt.savefig(out_path, dpi=300, bbox_inches='tight')
-        plt.show()
-        print(f"\n✅ Training Set DCA plot saved to: {out_path}")
-    except Exception as e:
-        print(f"❌ Error generating Training Set DCA: {e}"); traceback.print_exc()
-else:
-     print("\n⚠️ Skipping Training Set DCA (final model did not fit).")
-
-# %%
-# ==================================
-# 12. Training Set ROC
-# ======= Training Set ROC (cleaned) =======
-print("\n" + "="*60)
-print("--- Step 12: Generating Training Set ROC Curve ---")
-print("="*60)
-
-if final_model_fitted:
-    try:
-        # Ensure we have df_train_source_km (80% train source)
-        if 'df_train_source_km' not in locals():
-            df_train_source_km = df.iloc[train_idx].copy()
-            df_train_source_km['time'] = df_train_source_km[TIME_COL]
-            df_train_source_km['event'] = df_train_source_km[EVENT_COL].astype(bool)
-
-        # Prepare processed training matrix and feature names
-        preprocess_step = final_pipeline.named_steps['preprocess']
-        X_train_full_processed = preprocess_step.transform(X_train_full)
-        feature_names_processed = preprocess_step.get_feature_names_out()
-        X_processed_df = pd.DataFrame(X_train_full_processed,
-                                      columns=feature_names_processed,
-                                      index=X_train_full.index)
-
-        # Build lifelines summary if not present
-        if 'lifelines_summary' not in locals():
-            df_lifelines_tmp = X_processed_df.copy()
-            df_lifelines_tmp['time'] = y_train_full['time']
-            df_lifelines_tmp['event'] = y_train_full['event']
-            cph_tmp = CoxPHFitter(penalizer=0)
-            cph_tmp.fit(df_lifelines_tmp, duration_col='time', event_col='event')
-            lifelines_summary = cph_tmp.summary
-
-        significant_vars_summary = lifelines_summary[lifelines_summary['p'] < 0.05].copy()
-        if significant_vars_summary.empty:
-            raise ValueError("No significant variables (p < 0.05) found for ROC scorecard.")
-
-        risk_scorecard_coef = significant_vars_summary[['coef']]
-        scorecard_lifelines_names = risk_scorecard_coef.index.tolist()
-
-        # map lifelines names to processed feature names
-        processed_names = list(feature_names_processed)
-        actual_feature_names_mapping = {}
-        missing_in_actual = []
-        for ll_name in scorecard_lifelines_names:
-            if ll_name in processed_names:
-                actual_feature_names_mapping[ll_name] = ll_name
-            else:
-                base = ll_name.split('__')[-1]
-                matched = [n for n in processed_names if n.endswith(base)]
-                if len(matched) == 1:
-                    actual_feature_names_mapping[ll_name] = matched[0]
-                else:
-                    missing_in_actual.append(ll_name)
-        if missing_in_actual:
-            raise ValueError(f"ROC Scorecard mapping failed: {missing_in_actual}")
-
-        score_features_actual = [actual_feature_names_mapping[n] for n in scorecard_lifelines_names]
-        X_train_significant = X_processed_df[score_features_actual]
-        coef_vector = risk_scorecard_coef.loc[scorecard_lifelines_names, 'coef'].values
-
-        # compute linear predictor and align indices
-        train_total_risk_scores = X_train_significant.dot(coef_vector)
-        if not isinstance(train_total_risk_scores, pd.Series):
-            train_total_risk_scores = pd.Series(train_total_risk_scores, index=X_train_full.index)
-
-        # align to df_for_analysis (prefer df_train_source_km)
-        df_for_analysis = df_train_source_km.copy()
-        df_for_analysis['Total_Risk_Score_Coef'] = train_total_risk_scores.reindex(df_for_analysis.index)
-
-        # ensure time/event aligned
-        time_series = pd.Series(y_train_full['time'], index=X_train_full.index)
-        event_series = pd.Series(y_train_full['event'].astype(bool), index=X_train_full.index)
-        df_for_analysis['time'] = time_series.reindex(df_for_analysis.index).astype(float)
-        df_for_analysis['event'] = event_series.reindex(df_for_analysis.index).astype(bool)
-
-        print("✅ ROC data prepared and aligned.")
-
-        TIME_HORIZON_ROC = 4.0  # 4-year
-        y_true = (df_for_analysis['time'] <= TIME_HORIZON_ROC) & (df_for_analysis['event'])
-        y_score = df_for_analysis['Total_Risk_Score_Coef']
-
-        valid_mask = y_score.notna() & df_for_analysis['time'].notna() & df_for_analysis['event'].notna()
-        if valid_mask.sum() == 0:
-            raise ValueError("No valid samples with both score and outcome for ROC.")
-
-        if y_true[valid_mask].sum() < 1:
-            print(f"❌ No events at {TIME_HORIZON_ROC} years. Cannot calculate ROC.")
-        else:
-            fpr, tpr, thresholds = roc_curve(y_true[valid_mask].astype(int), y_score[valid_mask])
-            roc_auc = auc(fpr, tpr)
-            j_statistic = tpr - fpr
-            best_idx = np.nanargmax(j_statistic)
-            best_cutoff = thresholds[best_idx]
-            sensitivity = tpr[best_idx]
-            specificity = 1 - fpr[best_idx]
-            print(f"✅ ROC Analysis (Training Set): AUC = {roc_auc:.4f}")
-            print(f"   Best Cutoff (logHR): {best_cutoff:.4f} -> Sens={sensitivity:.2f}, Spec={specificity:.2f}")
-
-            # plot ROC
-            palette = sns.color_palette("colorblind")
-            plt.figure(figsize=(8, 8))
-            plt.plot(fpr, tpr, color=palette[0], lw=2.5, label=f'ROC curve (AUC = {roc_auc:.3f})')
-            plt.plot([0, 1], [0, 1], color='grey', lw=2, linestyle='--')
-            plt.scatter(fpr[best_idx], tpr[best_idx], marker='o', color=palette[3], s=120, zorder=3,
-                        label=f'Best Cutoff = {best_cutoff:.2f}\n(Sens={sensitivity:.2f}, Spec={specificity:.2f})')
-            plt.xlim([0.0, 1.0]); plt.ylim([0.0, 1.05])
-            plt.xlabel('1 - Specificity (False Positive Rate)', fontsize=14)
-            plt.ylabel('Sensitivity (True Positive Rate)', fontsize=14)
-            plt.title(f'ROC Curve for {TIME_HORIZON_ROC:.1f}-Year Risk (80% Training Set)', fontsize=14, weight='bold')
-            plt.legend(loc="lower right", fontsize=12); plt.grid(True, linestyle='--', alpha=0.6); sns.despine()
-
-            output_path = OUTPUT_DIR / "CHARLS_Training_Set_ROC_Curve.png"
-            plt.savefig(output_path, dpi=300, bbox_inches='tight')
-            plt.show()
-            print(f"✅ Training Set ROC curve saved to: {output_path}")
-
-    except Exception as e:
-        print(f"❌ Error generating Training Set ROC: {e}")
-        traceback.print_exc()
-else:
-    print("\n⚠️ Skipping Training Set ROC (final model did not fit).")
-# %%
-#Calibration_Curve
-print("\n" + "="*60)
-print("--- Step 13: Training-set Calibration Curve (4-year) ---")
-print("="*60)
-
-try:
-    if not final_model_fitted:
-        print("⚠️ Skipping calibration (final model not fitted).")
-    else:
-        TIME_HORIZON_CAL = 4.0
-
-        # Prepare true outcomes on training set (80% used for final fit)
-        # y_train_full is a structured array (sksurv). Use same logic as other sections.
-        y_train_times = y_train_full["time"]
-        y_train_events = y_train_full["event"].astype(bool)
-        y_true_train = (y_train_times <= TIME_HORIZON_CAL) & (y_train_events)
-
-        # Obtain predicted probability of event by TIME_HORIZON_CAL:
-        # Prefer predict_survival_function; fallback to score -> min-max to pseudo-prob.
-        try:
-            if hasattr(final_pipeline, "predict_survival_function"):
-                surv_funcs_train = final_pipeline.predict_survival_function(X_train_full)
-                # Some wrappers may return callables; evaluate at TIME_HORIZON_CAL
-                survival_probs_train = np.array([fn(TIME_HORIZON_CAL) for fn in surv_funcs_train])
-                prob_event_train = 1.0 - survival_probs_train
-            else:
-                raise AttributeError("final_pipeline lacks predict_survival_function")
-        except Exception:
-            # fallback: use risk score and map to [0,1] for calibration plotting (documented approximation)
-            scores_train = final_pipeline.predict(X_train_full)
-            min_s, max_s = np.nanmin(scores_train), np.nanmax(scores_train)
-            denom = (max_s - min_s) if (max_s - min_s) != 0 else 1.0
-            prob_event_train = (scores_train - min_s) / denom
-            print("⚠️ Used min-max scaled risk scores as pseudo-probabilities for calibration (fallback).")
-
-        # Align lengths / mask invalids
-        idx_train = np.arange(len(y_true_train))
-        mask_valid = (~np.isnan(prob_event_train)) & (~np.isnan(y_train_times))
-        if mask_valid.sum() == 0:
-            raise ValueError("No valid samples for calibration after alignment.")
-
-        y_true_valid = y_true_train[mask_valid].astype(int)
-        prob_pred_valid = np.array(prob_event_train)[mask_valid]
-
-        # Compute calibration curve (binning by quantiles -> stable for unbalanced events)
-        try:
-            prob_true_bins, prob_pred_bins = calibration_curve(y_true_valid, prob_pred_valid,
-                                                               n_bins=10, strategy='quantile')
-        except Exception as e_cal:
-            # fallback to uniform bins
-            prob_true_bins, prob_pred_bins = calibration_curve(y_true_valid, prob_pred_valid,
-                                                               n_bins=10, strategy='uniform')
-            print(f"⚠️ calibration_curve quantile failed, used uniform bins: {e_cal}")
-
-        # Calibration slope & intercept (linear regression of observed ~ predicted)
-        cal_slope, cal_intercept = (np.nan, np.nan)
-        try:
-            if len(prob_pred_bins) > 1:
-                lr = LinearRegression()
-                lr.fit(prob_pred_bins.reshape(-1, 1), prob_true_bins)
-                cal_slope = lr.coef_[0]
-                cal_intercept = lr.intercept_
-            else:
-                cal_slope, cal_intercept = (np.nan, np.nan)
-        except Exception as e_lr:
-            print(f"⚠️ Calibration slope/intercept calculation failed: {e_lr}")
-
-        # Print summary
-        print(f"\nCalibration (Training set, {TIME_HORIZON_CAL:.1f} years):")
-        print(f"  Samples used for calibration: {mask_valid.sum()}")
-        print(f"  Observed event rate at {TIME_HORIZON_CAL:.1f}y: {y_true_valid.mean():.4f}")
-        if not np.isnan(cal_intercept):
-            print(f"  Calibration intercept = {cal_intercept:.4f} (ideal 0)")
-        if not np.isnan(cal_slope):
-            print(f"  Calibration slope     = {cal_slope:.4f} (ideal 1)")
-
-        # Plot calibration curve
-        plt.figure(figsize=(7.5, 7.5))
-        plt.plot(prob_pred_bins, prob_true_bins, marker='o', linestyle='-', label='Observed vs Predicted')
-        plt.plot([0, 1], [0, 1], linestyle='--', color='gray', label='Perfect calibration')
-        # Optionally plot regression line if available
-        try:
-            if not np.isnan(cal_slope):
-                x_line = np.linspace(0, 1, 100)
-                y_line = cal_intercept + cal_slope * x_line
-                plt.plot(x_line, y_line, color='C1', linestyle=':', label=f'Calibration fit (slope={cal_slope:.2f})')
-        except Exception:
-            pass
-
-        plt.xlabel(f"Predicted probability of event by {TIME_HORIZON_CAL:.1f} years", fontsize=12)
-        plt.ylabel("Observed event rate (in bin)", fontsize=12)
-        plt.title(f"Calibration Curve (Training set, {TIME_HORIZON_CAL:.1f}-Year)", fontsize=14)
-        plt.grid(True, ls='--', alpha=0.6)
-        plt.legend(loc='upper left')
-        plt.xlim(0, min(1.0, max(np.max(prob_pred_bins), np.max(prob_true_bins), 0.4)))
-        plt.ylim(0, min(1.0, max(np.max(prob_pred_bins), np.max(prob_true_bins), 0.4)))
-
-        # Save figure
-        cal_path = OUTPUT_DIR / f"CHARLS_TrainingSet_Calibration_{int(TIME_HORIZON_CAL)}y.png"
-        plt.savefig(cal_path, dpi=300, bbox_inches='tight')
-        plt.show()
-        print(f"✅ Calibration curve saved to: {cal_path}")
-
-except Exception as e:
-    print(f"❌ Error generating calibration curve: {e}")
-    traceback.print_exc()
-# %%
